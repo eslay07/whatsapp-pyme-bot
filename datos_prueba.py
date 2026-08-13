@@ -32,8 +32,8 @@ def main() -> None:
             return
         empresa = Empresa(
             nombre="Tecno Pyme Demo",
-            telefono_whatsapp="+593999999998",
-            telefono_notificacion="+593999999997",
+            telefono_whatsapp="+593 00 000 0000",
+            telefono_notificacion="+593 00 000 0000",
             numero_cuenta_banco="2200123456",
             nombre_banco="Banco Demo",
             nombre_titular_cuenta="Tecno Pyme Demo S.A.",

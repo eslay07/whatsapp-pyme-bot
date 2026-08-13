@@ -15,12 +15,16 @@ class EmpresaBase(BaseModel):
     nombre_banco: str = Field(min_length=2, max_length=100)
     nombre_titular_cuenta: str = Field(min_length=2, max_length=150)
     mensaje_pago_personalizado: str | None = None
+    whatsapp_provider: Literal["meta", "twilio"] = "meta"
     meta_phone_number_id: str | None = Field(default=None, max_length=100)
+    twilio_account_sid: str | None = Field(default=None, max_length=100)
+    twilio_from_number: str | None = Field(default=None, max_length=50)
     activa: bool = True
 
 
 class EmpresaCreate(EmpresaBase):
     meta_access_token: str | None = Field(default=None, min_length=10)
+    twilio_auth_token: str | None = Field(default=None, min_length=10)
 
 
 class EmpresaUpdate(BaseModel):
@@ -33,14 +37,20 @@ class EmpresaUpdate(BaseModel):
     nombre_banco: str | None = None
     nombre_titular_cuenta: str | None = None
     mensaje_pago_personalizado: str | None = None
+    whatsapp_provider: Literal["meta", "twilio"] | None = None
     meta_phone_number_id: str | None = None
     meta_access_token: str | None = Field(default=None, min_length=10)
+    twilio_account_sid: str | None = None
+    twilio_auth_token: str | None = Field(default=None, min_length=10)
+    twilio_from_number: str | None = None
     activa: bool | None = None
 
 
 class EmpresaOut(EmpresaBase):
     id: int
     meta_configurada: bool
+    twilio_configurado: bool
+    canal_configurado: bool
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,6 +105,34 @@ class SimulacionOut(BaseModel):
     modo_ia: Literal["local", "openai"]
 
 
+class MetaSendTestIn(BaseModel):
+    numero_destino: str = Field(min_length=5, max_length=30)
+    mensaje: str = Field(min_length=1, max_length=2000)
+
+
+class MetaSendTestOut(BaseModel):
+    enviado: bool
+    detalle: str
+
+
+class MetaPhoneInfoOut(BaseModel):
+    id: str
+    display_phone_number: str | None = None
+    verified_name: str | None = None
+    quality_rating: str | None = None
+
+
+class ConversacionWhatsAppTestIn(BaseModel):
+    numero_cliente: str = Field(min_length=5, max_length=30)
+    mensaje: str = Field(min_length=1, max_length=2000)
+    enviar_respuesta: bool = True
+
+
+class ConversacionWhatsAppTestOut(SimulacionOut):
+    enviado_whatsapp: bool
+    detalle_envio: str
+
+
 class ConversacionOut(BaseModel):
     id: int
     empresa_id: int
@@ -103,4 +141,3 @@ class ConversacionOut(BaseModel):
     estado: str
     created_at: datetime
     updated_at: datetime
-

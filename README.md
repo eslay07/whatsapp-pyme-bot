@@ -1,260 +1,386 @@
-# WhatsApp Pyme Bot
+# WhatsApp PyME Bot
 
-API comercial multiempresa que atiende clientes por WhatsApp, busca productos,
-mantiene el contexto de la conversación, comparte datos de pago y avisa al
-propietario cuando aparece una intención de compra. Incluye un simulador local
-que funciona sin Meta ni una clave de inteligencia artificial.
+Backend multiempresa para atención comercial por WhatsApp.
 
-## ¿Qué hace este sistema?
+El proyecto recibe mensajes desde WhatsApp Cloud API, identifica a qué empresa pertenece el número que recibió la conversación, busca productos dentro de su catálogo y mantiene el contexto de cada cliente. Cuando detecta una intención de compra puede registrar el pedido, compartir instrucciones de pago y avisar al responsable de la empresa.
 
-- Entiende consultas como `tienes alexa`, `tienes aleja` o `la tercera`.
-- Busca únicamente dentro del catálogo de la empresa que recibió el mensaje.
-- Muestra hasta tres opciones disponibles con precios reales.
-- Conserva el historial por empresa y número de cliente.
-- Ante una compra, registra un pedido pendiente y entrega los datos bancarios.
-- Envía una alerta al propietario si WhatsApp está configurado.
-- Permite usar OpenAI de forma opcional; si falla, continúa con el motor local.
-- Evita procesar dos veces un mismo mensaje reenviado por Meta.
+La inteligencia artificial es opcional. El sistema incluye un motor local para poder desarrollar, probar y demostrar el flujo sin depender de una API externa.
 
-La aplicación no es un panel web visual. Es una API REST documentada
-automáticamente en `/docs`, lista para conectarse a un panel o sistema existente.
+## Qué problema busca resolver
 
-## Arquitectura
+En una PyME es común que las mismas preguntas se repitan durante el día:
+
+- si un producto está disponible;
+- cuánto cuesta;
+- cuál de varias opciones corresponde a lo que busca el cliente;
+- cómo puede pagar;
+- qué datos necesita para completar una compra.
+
+Cuando todo esto se responde manualmente, el tiempo de atención crece junto con el número de conversaciones.
+
+Este proyecto automatiza la primera parte de esa atención sin perder de vista algo importante: el bot solo trabaja con el catálogo y la configuración de la empresa que recibió el mensaje.
+
+## Flujo general
 
 ```text
-Cliente WhatsApp
-       |
-       v
-Webhook FastAPI ---- firma Meta + idempotencia
-       |
-       v
-Empresa identificada por phone_number_id
-       |
-       +---- historial de conversación
-       +---- búsqueda difusa del catálogo
-       +---- clasificador local / OpenAI opcional
-       +---- pedido y datos de pago
-       |
-       v
-WhatsApp Cloud API ---- respuesta al cliente / alerta al dueño
+Cliente
+   │
+   ▼
+WhatsApp Cloud API
+   │
+   ▼
+Webhook FastAPI
+   │
+   ├── valida el evento
+   ├── evita procesar duplicados
+   └── identifica la empresa
+          │
+          ▼
+   Servicio de conversación
+          │
+          ├── historial del cliente
+          ├── búsqueda de catálogo
+          ├── intención del mensaje
+          ├── IA opcional
+          └── pedido / pago
+          │
+          ▼
+WhatsApp Cloud API
+   │
+   ├── respuesta al cliente
+   └── aviso al responsable
 ```
 
-Cada producto, conversación y pedido lleva `empresa_id`. Las credenciales Meta
-se guardan por empresa y el token se cifra antes de entrar en la base de datos.
+## Características principales
 
-## Requisitos previos
+- arquitectura multiempresa;
+- integración con WhatsApp Cloud API;
+- webhook de verificación y recepción de mensajes;
+- validación de firma de Meta en producción;
+- control de mensajes duplicados;
+- catálogo independiente por empresa;
+- búsqueda aproximada con tolerancia a errores de escritura;
+- historial por empresa y número de cliente;
+- registro de pedidos;
+- información de pago configurable por empresa;
+- aviso al responsable cuando aparece intención de compra;
+- motor local de clasificación;
+- integración opcional con OpenAI;
+- fallback automático al motor local;
+- API administrativa;
+- cifrado de tokens de Meta;
+- SQLite para desarrollo;
+- PostgreSQL para despliegue;
+- migraciones con Alembic;
+- simulador local sin Meta;
+- documentación automática de FastAPI;
+- pruebas automatizadas.
 
-- Python 3.11 o 3.12.
-- Git.
-- Una terminal PowerShell, Bash o equivalente.
-- Opcional: cuenta de Meta Developers para WhatsApp real.
-- Opcional: cuenta de OpenAI si se desea mejorar la clasificación.
-- Opcional: ngrok para exponer el servidor local.
+## Ejemplo sencillo
 
-En Windows, comprueba Python con:
+Un cliente podría escribir:
 
-```powershell
-py --version
+```text
+hola tienes aleja?
 ```
 
-En Linux o macOS:
+Aunque escribió `aleja` en lugar de `alexa`, el buscador puede encontrar productos relacionados dentro del catálogo correspondiente.
 
-```bash
-python3 --version
+Después el cliente puede continuar:
+
+```text
+la tercera
 ```
 
-## Instalación paso a paso
+El sistema conserva el contexto de la conversación y puede relacionar esa frase con las opciones mostradas anteriormente.
 
-### 1. Clonar el repositorio
+Finalmente:
 
-```bash
-git clone https://github.com/TU_USUARIO/whatsapp-pyme-bot.git
-cd whatsapp-pyme-bot
+```text
+me la llevo, como pago?
 ```
 
-Si ya tienes estos archivos localmente, entra directamente en su directorio.
+Ese mensaje puede llevar el flujo hacia una intención de compra, creación del pedido e instrucciones de pago.
 
-### 2. Crear entorno virtual
+## Arquitectura del proyecto
 
-Windows PowerShell:
+La aplicación está construida con FastAPI y separa las rutas HTTP de la lógica de negocio.
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```text
+app/
+│
+├── main.py
+├── config.py
+├── database.py
+├── dependencies.py
+├── schemas.py
+│
+├── models/
+│
+├── routes/
+│   ├── admin.py
+│   ├── health.py
+│   ├── test_simulator.py
+│   └── webhook.py
+│
+├── services/
+│   ├── ai_service.py
+│   ├── catalogo_service.py
+│   ├── conversation_service.py
+│   ├── notificacion_service.py
+│   ├── security_service.py
+│   └── whatsapp_service.py
+│
+└── prompts/
 ```
 
-Linux o macOS:
+Fuera de `app/` se mantienen las migraciones, pruebas y archivos de despliegue:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+```text
+migrations/
+tests/
+alembic.ini
+datos_prueba.py
+requirements.txt
+render.yaml
+Procfile
+.env.example
 ```
 
-### 3. Instalar dependencias
+## Separación por responsabilidades
 
-```bash
+### Rutas
+
+`app/routes/` recibe las solicitudes HTTP.
+
+Actualmente contiene:
+
+- `webhook.py`: comunicación entrante desde Meta;
+- `admin.py`: administración de empresas, productos y conversaciones;
+- `health.py`: comprobación del estado de la aplicación;
+- `test_simulator.py`: simulación local de mensajes.
+
+### Servicios
+
+`app/services/` contiene la lógica que no debería vivir directamente dentro de una ruta.
+
+Entre los servicios actuales están:
+
+- catálogo;
+- conversación;
+- IA;
+- WhatsApp;
+- notificaciones;
+- seguridad y cifrado.
+
+Esta separación ayuda a probar cada parte sin tener que levantar siempre todo el servidor.
+
+## Multiempresa
+
+La empresa se identifica a partir del `phone_number_id` recibido desde Meta.
+
+Los registros de negocio se relacionan con una empresa concreta. Eso incluye, entre otros:
+
+- productos;
+- conversaciones;
+- pedidos;
+- configuración de WhatsApp.
+
+La intención es evitar que el catálogo o el historial de una empresa aparezca accidentalmente en la conversación de otra.
+
+## Catálogo y búsqueda
+
+El catálogo se guarda en la base de datos y cada producto pertenece a una empresa.
+
+La búsqueda no depende únicamente de coincidencias exactas. El proyecto utiliza `rapidfuzz` para tolerar consultas aproximadas o errores comunes de escritura.
+
+Esto permite resolver búsquedas como:
+
+```text
+alexa
+aleja
+echo
+echo dot
+tercera generacion
+```
+
+sin exigir que el cliente escriba exactamente el nombre almacenado en la base.
+
+## Conversaciones
+
+Cada conversación conserva contexto por:
+
+```text
+empresa + número de cliente
+```
+
+Esto permite que una respuesta corta tenga sentido después de una pregunta anterior.
+
+Ejemplo:
+
+```text
+Cliente: tienes alexa?
+Bot: ...
+Cliente: la tercera
+```
+
+La segunda frase se interpreta usando el historial reciente y no como un mensaje completamente independiente.
+
+## Inteligencia artificial
+
+El proyecto puede trabajar de dos maneras:
+
+```text
+AI_PROVIDER=local
+```
+
+o:
+
+```text
+AI_PROVIDER=openai
+```
+
+El modo local permite ejecutar el sistema sin una clave externa.
+
+Si se configura OpenAI, el servicio puede utilizarlo como apoyo para interpretar la intención del mensaje. Antes de enviar información al modelo se trabaja con productos candidatos reales del catálogo.
+
+Si la llamada externa falla, excede el tiempo configurado o devuelve una respuesta inválida, el flujo puede continuar con el motor local.
+
+La IA es una ayuda para interpretación; el catálogo y los identificadores válidos siguen viniendo de la base de datos.
+
+## Seguridad
+
+Los tokens de Meta no se devuelven desde la API administrativa y se cifran antes de almacenarse.
+
+La configuración sensible debe estar en `.env`, nunca dentro del código.
+
+El repositorio publica únicamente:
+
+```text
+.env.example
+```
+
+como referencia de las variables necesarias.
+
+Entre las variables utilizadas están:
+
+```text
+ENVIRONMENT
+DATABASE_URL
+ADMIN_SECRET_KEY
+ENCRYPTION_KEY
+WHATSAPP_VERIFY_TOKEN
+META_APP_SECRET
+WHATSAPP_API_VERSION
+AI_PROVIDER
+OPENAI_API_KEY
+OPENAI_MODEL
+OPENAI_TIMEOUT_SECONDS
+```
+
+`ENCRYPTION_KEY` debe mantenerse estable. Si se cambia después de haber cifrado tokens, las credenciales guardadas anteriormente ya no podrán recuperarse correctamente.
+
+## Requisitos
+
+- Python 3.11 o 3.12;
+- Git;
+- pip;
+- opcionalmente una cuenta de Meta Developers;
+- opcionalmente una clave de OpenAI;
+- PostgreSQL para una instalación persistente en servidor.
+
+## Instalación en Windows
+
+### 1. Entrar al proyecto
+
+```cmd
+cd /d "RUTA\whatsapp-pyme-bot"
+```
+
+### 2. Crear el entorno virtual
+
+```cmd
+py -3.12 -m venv .venv
+```
+
+### 3. Activarlo desde CMD
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+### 4. Instalar dependencias
+
+```cmd
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Todas las dependencias están fijadas a versiones exactas para que el entorno
-sea reproducible.
+### 5. Crear la configuración local
 
-### 4. Configurar variables de entorno
-
-Windows:
-
-```powershell
-Copy-Item .env.example .env
+```cmd
+copy .env.example .env
 ```
 
-Linux o macOS:
+Edita `.env` y cambia como mínimo las claves locales.
 
-```bash
-cp .env.example .env
-```
-
-Para una prueba local gratuita basta con revisar estas variables:
+Para desarrollo sin Meta ni OpenAI:
 
 ```env
 ENVIRONMENT=development
 DATABASE_URL=sqlite:///./whatsapp_bot.db
-ADMIN_SECRET_KEY=una-clave-larga-y-privada
-ENCRYPTION_KEY=otra-clave-larga-y-estable
+ADMIN_SECRET_KEY=CAMBIA_ESTA_CLAVE
+ENCRYPTION_KEY=CAMBIA_ESTA_CLAVE
 AI_PROVIDER=local
 ```
 
-`ENCRYPTION_KEY` debe conservarse. Si cambia después de registrar tokens Meta,
-estos ya no podrán descifrarse.
+## Base de datos
 
-Variables disponibles:
+El esquema se administra con Alembic.
 
-| Variable | Uso |
-|---|---|
-| `DATABASE_URL` | SQLite local o PostgreSQL en despliegue |
-| `ADMIN_SECRET_KEY` | Valor requerido en la cabecera `X-Admin-Key` |
-| `ENCRYPTION_KEY` | Cifra los tokens Meta de cada empresa |
-| `WHATSAPP_VERIFY_TOKEN` | Token elegido para el handshake del webhook |
-| `META_APP_SECRET` | Valida la firma `X-Hub-Signature-256` |
-| `WHATSAPP_API_VERSION` | Versión de Graph API usada para enviar mensajes |
-| `AI_PROVIDER` | `local` u `openai` |
-| `OPENAI_API_KEY` | Credencial opcional de OpenAI |
-| `OPENAI_MODEL` | Modelo configurable, por defecto `gpt-5.4-mini` |
-| `OPENAI_TIMEOUT_SECONDS` | Tiempo máximo antes del fallback local |
+Después de instalar las dependencias:
 
-### 5. Crear la base de datos
-
-El esquema se administra exclusivamente con Alembic:
-
-```bash
+```cmd
 alembic upgrade head
 ```
 
-Para cargar una empresa demo y diez productos:
+Para cargar información de demostración:
 
-```bash
+```cmd
 python datos_prueba.py
 ```
 
-El script muestra el identificador de la empresa. Normalmente será `1`.
+La base local de desarrollo puede ser SQLite.
 
-### 6. Iniciar el servidor
+En despliegues con almacenamiento efímero conviene utilizar PostgreSQL.
 
-```bash
+## Iniciar la API
+
+```cmd
 uvicorn app.main:app --reload
 ```
 
-Abre:
-
-- API: <http://127.0.0.1:8000>
-- Documentación interactiva: <http://127.0.0.1:8000/docs>
-- Estado: <http://127.0.0.1:8000/health>
-
-### 7. Exponer con ngrok
-
-Instala ngrok desde su sitio oficial y autentica tu cuenta. Con la API encendida:
-
-```bash
-ngrok http 8000
-```
-
-Ngrok mostrará una URL HTTPS semejante a:
+Con la configuración local habitual estarán disponibles:
 
 ```text
-https://ejemplo-1234.ngrok-free.app
+http://127.0.0.1:8000
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/health
 ```
 
-El webhook público será:
+`/docs` abre la documentación interactiva generada por FastAPI.
+
+## Simulador local
+
+El simulador permite probar la lógica sin configurar todavía un número real de WhatsApp.
+
+Ruta:
 
 ```text
-https://ejemplo-1234.ngrok-free.app/webhook
+POST /test/simular-mensaje
 ```
 
-La URL gratuita cambia al reiniciar ngrok; actualízala en Meta cuando ocurra.
-
-### 8. Configurar el webhook en Meta
-
-1. Crea una aplicación en Meta for Developers.
-2. Agrega el producto WhatsApp.
-3. En la configuración de webhooks usa la URL pública terminada en `/webhook`.
-4. Usa exactamente el valor de `WHATSAPP_VERIFY_TOKEN` como token de verificación.
-5. Suscribe el campo `messages`.
-6. Copia el secreto de la aplicación a `META_APP_SECRET`.
-7. Obtén el `phone_number_id` y un token apropiado.
-8. Guarda ambos en la empresa mediante la API administrativa.
-
-En producción, `META_APP_SECRET` es obligatorio. En `development`, si está vacío,
-la firma se omite para facilitar pruebas manuales.
-
-### 9. Agregar tu primera empresa
-
-Todas las rutas `/admin` requieren `X-Admin-Key`.
-
-```bash
-curl -X POST http://127.0.0.1:8000/admin/empresas \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Key: una-clave-larga-y-privada" \
-  -d '{
-    "nombre": "Mi Tienda",
-    "telefono_whatsapp": "+593999999999",
-    "telefono_notificacion": "+593988888888",
-    "numero_cuenta_banco": "2200123456",
-    "nombre_banco": "Mi Banco",
-    "nombre_titular_cuenta": "Mi Tienda S.A.",
-    "mensaje_pago_personalizado": "Puedes pagar por transferencia:",
-    "meta_phone_number_id": "ID_ENTREGADO_POR_META",
-    "meta_access_token": "TOKEN_ENTREGADO_POR_META",
-    "activa": true
-  }'
-```
-
-La respuesta incluye `meta_configurada`, pero nunca devuelve el token.
-
-### 10. Agregar productos
-
-Sustituye `1` por el identificador de la empresa:
-
-```bash
-curl -X POST http://127.0.0.1:8000/admin/empresas/1/productos \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Key: una-clave-larga-y-privada" \
-  -d '{
-    "nombre": "Alexa Echo Dot 3ra Generación",
-    "descripcion": "Altavoz inteligente compacto con asistente Alexa",
-    "precio": "60.00",
-    "stock": 10,
-    "palabras_clave": "alexa,aleja,echo dot,amazon,3ra,tercera generación",
-    "categoria": "Asistentes",
-    "disponible": true
-  }'
-```
-
-Los precios viajan como cadenas decimales en JSON para evitar errores de punto
-flotante.
-
-### 11. Probar con WhatsApp Simulator
-
-En `/docs`, abre `POST /test/simular-mensaje`, pulsa **Try it out** y usa:
+Ejemplo:
 
 ```json
 {
@@ -264,229 +390,226 @@ En `/docs`, abre `POST /test/simular-mensaje`, pulsa **Try it out** y usa:
 }
 ```
 
-No se requiere `X-Admin-Key`, Meta ni OpenAI. No uses este endpoint públicamente
-en una instalación comercial sin añadir autenticación o bloquearlo por red.
+El simulador es muy útil durante desarrollo, pero una instalación pública debería protegerlo o deshabilitarlo si no se necesita.
 
-## Cómo probar localmente sin Meta
+## API administrativa
 
-Secuencia de ejemplo:
+Las rutas administrativas utilizan:
 
-```bash
-curl -X POST http://127.0.0.1:8000/test/simular-mensaje \
-  -H "Content-Type: application/json" \
-  -d '{"empresa_id":1,"numero_cliente":"+593999999999","mensaje":"tienes alexa?"}'
+```text
+X-Admin-Key
 ```
 
-```bash
-curl -X POST http://127.0.0.1:8000/test/simular-mensaje \
-  -H "Content-Type: application/json" \
-  -d '{"empresa_id":1,"numero_cliente":"+593999999999","mensaje":"la tercera"}'
+como protección básica.
+
+La clave debe coincidir con:
+
+```text
+ADMIN_SECRET_KEY
 ```
 
-```bash
-curl -X POST http://127.0.0.1:8000/test/simular-mensaje \
-  -H "Content-Type: application/json" \
-  -d '{"empresa_id":1,"numero_cliente":"+593999999999","mensaje":"me la llevo, como pago?"}'
+Entre las operaciones disponibles están:
+
+- crear y actualizar empresas;
+- consultar empresas;
+- administrar productos;
+- consultar conversaciones.
+
+Esta protección es suficiente para el alcance actual del proyecto, pero si se construye un panel multiusuario debería evolucionar hacia autenticación y autorización con roles.
+
+## Webhook de Meta
+
+El webhook utiliza:
+
+```text
+GET /webhook
 ```
 
-La respuesta contiene:
+para el proceso de verificación y:
 
-```json
-{
-  "respuesta_bot": "texto enviado al cliente",
-  "intencion_detectada": "buscar_producto",
-  "productos_encontrados": [],
-  "modo_ia": "local"
-}
+```text
+POST /webhook
 ```
 
-Para ejecutar las pruebas automatizadas:
+para recibir eventos.
 
-```bash
-pytest --cov=app --cov-report=term-missing
+En producción debe configurarse:
+
+```text
+META_APP_SECRET
 ```
 
-## Activar OpenAI
+para validar la firma enviada por Meta.
 
-Edita `.env`:
+El proyecto también evita procesar más de una vez el mismo mensaje cuando Meta reintenta la entrega.
 
-```env
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5.4-mini
+## Envío de mensajes
+
+La comunicación saliente está encapsulada en el servicio de WhatsApp.
+
+Cada empresa puede tener su propia configuración de Meta.
+
+Esto permite que la lógica general de atención se reutilice sin mezclar tokens o números entre negocios.
+
+## Datos de pago
+
+Cada empresa puede mantener su propia información de pago.
+
+Cuando se identifica una compra, el bot puede devolver esos datos al cliente de acuerdo con la configuración almacenada.
+
+Los ejemplos y datos de demostración no deben contener cuentas bancarias reales.
+
+## Pruebas
+
+El proyecto tiene pruebas separadas para varias áreas:
+
+```text
+tests/test_admin.py
+tests/test_ai_service.py
+tests/test_catalogo.py
+tests/test_migrations.py
+tests/test_simulator.py
+tests/test_webhook.py
 ```
 
-Reinicia el servidor. La integración usa Responses API y salida estructurada
-validada por Pydantic. Antes de consultar al modelo, el servidor preselecciona
-productos reales; cualquier identificador inexistente se descarta. Si hay un
-timeout, error de red o respuesta inválida, el motor local responde sin detener
-la conversación.
+Para ejecutarlas:
 
-El uso de la API de OpenAI puede tener costo y no es necesario para desarrollar
-o demostrar el sistema.
+```cmd
+py -3.12 -m pytest
+```
 
-## Endpoints
+Con cobertura:
 
-| Método | Ruta | Protección | Descripción |
-|---|---|---|---|
-| GET | `/health` | Pública | Estado de API y base de datos |
-| GET | `/webhook` | Token Meta | Handshake de verificación |
-| POST | `/webhook` | Firma Meta | Mensajes entrantes |
-| POST | `/test/simular-mensaje` | Pública | Simulación local |
-| POST | `/admin/empresas` | Admin | Crear empresa |
-| GET | `/admin/empresas/{id}` | Admin | Consultar empresa |
-| PUT | `/admin/empresas/{id}` | Admin | Actualizar empresa |
-| GET | `/admin/empresas/{id}/productos` | Admin | Listar catálogo |
-| POST | `/admin/empresas/{id}/productos` | Admin | Crear producto |
-| PUT | `/admin/productos/{id}` | Admin | Actualizar producto |
-| DELETE | `/admin/productos/{id}` | Admin | Eliminar producto |
-| GET | `/admin/conversaciones/{empresa_id}` | Admin | Consultar historiales |
+```cmd
+py -3.12 -m pytest --cov=app --cov-report=term-missing
+```
 
-## Cómo hacer deploy en Railway
+Esta validación debería ejecutarse antes de confirmar cambios importantes.
 
-Railway dispone actualmente de crédito gratuito limitado para experimentación;
-no debe interpretarse como alojamiento comercial gratuito e ilimitado. Revisa
-los precios vigentes antes de ofrecer un SLA.
+## Dependencias principales
 
-1. Publica el proyecto en GitHub.
-2. En Railway elige **New Project** y **Deploy from GitHub repo**.
-3. Selecciona este repositorio.
-4. Agrega un servicio PostgreSQL.
-5. Copia su URL en `DATABASE_URL` si Railway no la inyecta automáticamente.
-6. Configura todas las variables secretas de `.env.example`.
-7. Usa como comando de inicio:
+El proyecto utiliza, entre otras:
 
-```bash
+- FastAPI;
+- SQLAlchemy;
+- Alembic;
+- Pydantic;
+- psycopg;
+- httpx;
+- cryptography;
+- RapidFuzz;
+- OpenAI;
+- pytest;
+- Uvicorn.
+
+Las versiones exactas están fijadas en `requirements.txt`.
+
+## Despliegue
+
+El repositorio contiene:
+
+```text
+render.yaml
+Procfile
+```
+
+para facilitar el despliegue.
+
+La aplicación necesita ejecutar las migraciones antes de iniciar el servidor.
+
+Un comando de inicio habitual es:
+
+```text
 alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-8. Genera un dominio público.
-9. Comprueba `https://TU_DOMINIO/health`.
-10. Configura `https://TU_DOMINIO/webhook` en Meta.
-
-No uses SQLite en Railway, Render u otro sistema con disco efímero: los datos
-pueden desaparecer al reiniciar o desplegar. PostgreSQL evita ese problema.
-
-## Alternativa en Render
-
-El archivo `render.yaml` contiene una plantilla. En el panel de Render:
-
-1. Crea un Blueprint desde el repositorio.
-2. Asigna una base PostgreSQL y su URL.
-3. Completa los secretos.
-4. Despliega y comprueba `/health`.
-
-Los servicios gratuitos pueden dormir tras inactividad y su disco local es
-efímero. La base PostgreSQL gratuita también puede tener duración limitada.
-
-## Cómo agregar una nueva empresa cliente
-
-1. Crea una cuenta/número de WhatsApp Cloud API para el cliente.
-2. Registra la empresa con su `meta_phone_number_id` y token.
-3. Agrega su catálogo usando el `empresa_id` devuelto.
-4. Prueba primero con `/test/simular-mensaje`.
-5. Envía un mensaje real al número conectado.
-6. Revisa el historial en `/admin/conversaciones/{empresa_id}`.
-7. Rota el token mediante `PUT /admin/empresas/{id}` cuando sea necesario.
-
-Los datos nunca se mezclan: la empresa se identifica desde el
-`phone_number_id` presente en cada evento de Meta.
-
-## Estructura de archivos explicada
-
-```text
-app/
-  main.py                 Ensambla FastAPI y sus rutas
-  config.py               Variables de entorno
-  database.py             Motor y sesiones SQLAlchemy
-  dependencies.py         Protección administrativa
-  models/                 Empresas, productos, conversaciones y pedidos
-  routes/                 Webhook, CRUD, salud y simulador
-  services/               IA, catálogo, WhatsApp, cifrado y orquestación
-  prompts/                Instrucciones versionadas de OpenAI
-migrations/               Historial Alembic del esquema
-tests/                    Pruebas unitarias y de integración
-datos_prueba.py           Carga reproducible de demostración
-render.yaml               Plantilla opcional para Render
-Procfile                  Comando compatible con Railway/Render
-```
-
-## Seguridad y producción
-
-Antes de vender el servicio:
-
-- Usa secretos largos generados aleatoriamente.
-- Configura `ENVIRONMENT=production` y `META_APP_SECRET`.
-- Protege o desactiva el simulador público.
-- Sustituye la clave administrativa por JWT con roles si habrá varios usuarios.
-- Añade rate limiting delante de endpoints públicos.
-- Usa PostgreSQL administrado con copias de seguridad.
-- Registra errores y métricas sin guardar tokens ni datos bancarios completos.
-- Define políticas de retención y eliminación del historial.
-- Usa tokens Meta de larga duración y un procedimiento de rotación.
-- Revisa las normas de consentimiento, plantillas y ventana de servicio de Meta.
+En producción se recomienda PostgreSQL y no una base SQLite dentro de un disco efímero.
 
 ## Integración continua
 
-`.github/workflows/ci.yml` ejecuta en cada push a `main` y pull request:
+El repositorio incluye configuración bajo:
 
-1. instalación reproducible;
-2. migración Alembic;
-3. pruebas con cobertura.
-
-## Preguntas frecuentes
-
-### ¿Necesito pagar para probarlo?
-
-No. `AI_PROVIDER=local` y `/test/simular-mensaje` permiten probar el flujo sin
-Meta ni OpenAI.
-
-### ¿Por qué no crea las tablas al arrancar?
-
-Para que cada cambio de esquema sea explícito, auditable y compatible con
-producción. Ejecuta `alembic upgrade head`.
-
-### ¿Puedo usar PostgreSQL sin cambiar código?
-
-Sí. Instala las dependencias y cambia `DATABASE_URL` por una URL PostgreSQL.
-
-### ¿Qué ocurre si OpenAI falla?
-
-La petición se clasifica con reglas locales y la conversación continúa.
-
-### ¿Qué ocurre si Meta reenvía el mismo mensaje?
-
-El identificador `wamid` queda registrado y el segundo evento se ignora.
-
-### ¿Admite audios, imágenes o documentos?
-
-Esta versión procesa solo texto. Los demás tipos se reconocen y se ignoran con
-respuesta HTTP 200 para evitar reintentos innecesarios.
-
-### ¿Por qué el token Meta no aparece al consultar la empresa?
-
-Se cifra en reposo y se excluye deliberadamente de todos los esquemas públicos.
-
-### ¿Puedo cambiar de modelo?
-
-Sí, mediante `OPENAI_MODEL`. Verifica que el modelo soporte salida estructurada
-en Responses API.
-
-## Ejecución rápida en tres comandos
-
-Después de crear y activar el entorno virtual:
-
-```bash
-pip install -r requirements.txt
-alembic upgrade head && python datos_prueba.py
-uvicorn app.main:app --reload
+```text
+.github/
 ```
 
-## Referencias
+para automatizar comprobaciones del proyecto.
 
-- [OpenAI Responses API](https://developers.openai.com/api/docs/guides/migrate-to-responses)
-- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
-- [WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/)
-- [Railway Pricing](https://docs.railway.com/pricing)
-- [Render Free Services](https://render.com/docs/free)
+Antes de aceptar un cambio importante deberían pasar:
 
+- instalación de dependencias;
+- migraciones;
+- pruebas automatizadas.
+
+## Qué no debe publicarse
+
+No deben entrar al repositorio:
+
+- `.env`;
+- bases SQLite locales;
+- credenciales;
+- tokens Meta;
+- claves OpenAI;
+- claves de cifrado;
+- logs con conversaciones reales;
+- datos bancarios reales;
+- exports con información de clientes;
+- archivos de IDE;
+- entornos virtuales;
+- notas personales de Git.
+
+`.env.example` sí debe mantenerse porque contiene solamente nombres de variables y valores de demostración.
+
+## Comentarios en el código
+
+Los comentarios deberían explicar decisiones que no son obvias.
+
+Ejemplo útil:
+
+```python
+# Meta puede reenviar el mismo evento si no recibe respuesta a tiempo.
+# Guardamos el identificador para evitar responder dos veces al cliente.
+```
+
+Otro ejemplo:
+
+```python
+# La búsqueda siempre se limita a la empresa actual.
+# Un resultado de otra empresa nunca debe participar como candidato.
+```
+
+No hace falta comentar instrucciones evidentes como:
+
+```python
+# Devuelve el resultado
+return resultado
+```
+
+La intención es que los comentarios ayuden a entender el motivo de una regla, no que traduzcan Python al español línea por línea.
+
+## Flujo recomendado para cambios
+
+```text
+1. Actualizar la rama local.
+2. Modificar una parte concreta.
+3. Ejecutar las pruebas.
+4. Revisar los cambios.
+5. Preparar únicamente los archivos relacionados.
+6. Crear un commit descriptivo.
+7. Publicar.
+```
+
+## Estado de ramas
+
+La rama pública principal es:
+
+```text
+main
+```
+
+La variante de interfaz de escritorio debe revisarse por separado antes de publicarse, para confirmar que siga teniendo sentido como alternativa y no como parte de la API principal.
+
+## Autor
+
+**Jimmy Omar Toapanta Guayanay**  
+Ingeniero en Informática — Quito, Ecuador

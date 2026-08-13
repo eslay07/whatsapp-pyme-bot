@@ -20,7 +20,7 @@ def webhook_payload(message_id="wamid.1"):
                             "messages": [
                                 {
                                     "id": message_id,
-                                    "from": "593999999999",
+                                    "from": "+593 00 000 0000",
                                     "type": "text",
                                     "text": {"body": "hola tienes alexa?"},
                                 }

@@ -46,8 +46,8 @@ def sample_empresa(client: TestClient, admin_headers: dict[str, str]) -> dict:
         headers=admin_headers,
         json={
             "nombre": "Tienda Uno",
-            "telefono_whatsapp": "+593990000001",
-            "telefono_notificacion": "+593990000002",
+            "telefono_whatsapp": "+593 00 000 0000",
+            "telefono_notificacion": "+593 00 000 0000",
             "numero_cuenta_banco": "123456",
             "nombre_banco": "Banco Demo",
             "nombre_titular_cuenta": "Tienda Uno",

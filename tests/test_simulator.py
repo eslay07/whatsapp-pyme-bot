@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.models import Pedido
 
 
-def simulate(client, company_id, message, number="+593999999999"):
+def simulate(client, company_id, message, number="+593 00 000 0000"):
     return client.post(
         "/test/simular-mensaje",
         json={
