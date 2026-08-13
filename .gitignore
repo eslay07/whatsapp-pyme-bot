@@ -39,3 +39,6 @@ PASOS_GIT_GITHUB*.txt
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+# Instrucciones locales para publicar la documentación
+documentacion/COMANDOS_COMMIT_DOCUMENTACION.txt
