@@ -1,5 +1,15 @@
 # WhatsApp PyME Bot
 
+## Lectura rápida para evaluar el proyecto
+
+Backend multiempresa para responder consultas de catálogo, conservar conversaciones y registrar intención de compra.
+
+**Tecnologías:** Python · FastAPI · SQLAlchemy · Alembic · WhatsApp Cloud API
+**Estado:** La integración real requiere configuración de Meta y despliegue. El simulador permite revisar el recorrido sin enviar mensajes externos; no se afirma aquí un despliegue de producción auditado.
+
+[Ver el problema, la evidencia de implementación y las limitaciones](PORTFOLIO.md) · [Portafolio del autor](https://github.com/eslay07)
+
+
 Backend multiempresa para atención comercial por WhatsApp.
 
 El proyecto recibe mensajes desde WhatsApp Cloud API, identifica a qué empresa pertenece el número que recibió la conversación, busca productos dentro de su catálogo y mantiene el contexto de cada cliente. Cuando detecta una intención de compra puede registrar el pedido, compartir instrucciones de pago y avisar al responsable de la empresa.
@@ -611,5 +621,5 @@ La variante de interfaz de escritorio debe revisarse por separado antes de publi
 
 ## Autor
 
-**Jimmy Omar Toapanta Guayanay**  
+**Jimmy Omar Toapanta Guayanay**
 Ingeniero en Informática — Quito, Ecuador
