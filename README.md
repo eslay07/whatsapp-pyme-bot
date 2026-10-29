@@ -1,5 +1,8 @@
 # WhatsApp PyME Bot
 
+[Guía visual actual con capturas (PDF)](docs/portafolio/Guia_Visual_Actual.pdf) · [Procedencia y alcance de las muestras](docs/portafolio/README.md)
+
+
 ## Lectura rápida para evaluar el proyecto
 
 Backend multiempresa para responder consultas de catálogo, conservar conversaciones y registrar intención de compra.
